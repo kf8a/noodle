@@ -46,18 +46,9 @@ class PastaEval
       end
 
       if @report
-        File.write('response.xml',@report)
-
         print_summary
+        save_results
 
-        # remove valid checks
-        @report.search('//qr:status[contains(text(), "valid")]/..').each do |node|
-          node.remove
-        end
-
-        File.open("#{@scope}-#{@identifier}-#{@rev}",'w') do |file|
-          file.write @report
-        end
         @report = nil
       else
         puts ' timeout'
@@ -79,6 +70,30 @@ class PastaEval
 
   def errors
     @report.search('//qr:status[contains(text(), "error")]')
+  end
+
+  def save_results
+
+    if File.exists?('index.html')
+      index = Nokogiri::HTML(open('index.html'))
+    else
+      builder = Nokogiri::HTML::Builder.new do |doc|
+        doc.html {
+          doc.body { }
+        }
+      end
+      index = builder.to_html
+    end
+    # append a line to the index file
+
+    # remove valid checks
+    @report.search('//qr:status[contains(text(), "valid")]/..').each do |node|
+      node.remove
+    end
+
+    File.open("#{@scope}-#{@identifier}-#{@rev}",'w') do |file|
+      file.write @report
+    end
   end
 
   def print_summary
