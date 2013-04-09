@@ -107,3 +107,26 @@ class PastaEval
 
 end
 
+Main {
+  argument 'url'
+  option('p') { description 'to use the production server' }
+  option('debug') { description 'print debugging statements' }
+  option('timeout') {
+    argument :optional
+    cast :integer
+    default 30
+    description 'timeout in minutes'
+  }
+
+  def run
+    if params['debug'].given?
+      Typhoeus::Config.verbose = true
+    end
+
+    pusher = PastaEval.new
+    pusher.url = params['url'].value
+    pusher.evaluate(params['p'],params['timeout'].value)
+    puts "done, now get back to work!"
+  end
+}
+
