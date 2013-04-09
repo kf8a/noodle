@@ -20,10 +20,7 @@ class PastaEval
       print "#{eml_url.text} "
       eml_doc = Nokogiri::XML(open(eml_url))
 
-      info = eml_url.parent
-      @scope = info.search('scope').text
-      @identifier = info.search('identifier').text
-      @rev = info.search('revision').text
+      set_scope_id_rev(eml_url)
 
       # try to evaluate
       response = Typhoeus.post("#{@server}/package/evaluate/eml",
@@ -33,7 +30,6 @@ class PastaEval
 
       #poll for completion
       n = 0
-      $stdout.sync = true
       while n < 200 do
         sleep 5
         print '.'
@@ -43,7 +39,6 @@ class PastaEval
 
         n += 1
       end
-      $stdout.sync = false
 
       if @errors
         puts @errors
@@ -51,18 +46,17 @@ class PastaEval
       end
 
       if @report
-        doc = Nokogiri::XML(@report)
-        File.write('response.xml',doc)
+        File.write('response.xml',@report)
 
-        print_summary(doc)
+        print_summary
 
         # remove valid checks
-        doc.search('//qr:status[contains(text(), "valid")]/..').each do |node|
+        @report.search('//qr:status[contains(text(), "valid")]/..').each do |node|
           node.remove
         end
 
         File.open("#{@scope}-#{@identifier}-#{@rev}",'w') do |file|
-          file.write doc
+          file.write @report
         end
         @report = nil
       else
@@ -71,29 +65,36 @@ class PastaEval
     end
   end
 
-  def print_summary(doc)
-    valids = doc.search('//qr:status[contains(text(), "valid")]')
-    warns  = doc.search('//qr:status[contains(text(), "warn")]')
-    infos  = doc.search('//qr:status[contains(text(), "info")]')
-    errors = doc.search('//qr:status[contains(text(), "error")]')
-    File.write('response.xml',doc)
+  def valids
+    @report.search('//qr:status[contains(text(), "valid")]')
+  end
 
+  def warns
+    @report.search('//qr:status[contains(text(), "warn")]')
+  end
+
+  def infos
+    @report.search('//qr:status[contains(text(), "info")]')
+  end
+
+  def errors
+    @report.search('//qr:status[contains(text(), "error")]')
+  end
+
+  def print_summary
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
+  end
 
-    # [warns,errors].each do |problems|
-    #   problems.each do |problem|
-    #     description = problem.search('/qr:desscription').text
-    #     expected    = problem.search('/qr:expected').text
-    #     found       = problem.search('/qr:found').text
-    #     puts description
-    #     puts "expected: #{expected}, found: #{found}"
-    #   end
-    # end
+  def set_scope_id_rev(fragment)
+    info = fragment.parent
+    @scope = info.search('scope').text
+    @identifier = info.search('identifier').text
+    @rev = info.search('revision').text
   end
 
   def pasta_success?
     response = Typhoeus.get("#{@server}/package/evaluate/report/eml/#{@scope}/#{@identifier}/#{@rev}/#{@transaction_id}")
-    @report = response.response_body if response.success?
+    @report = Nokogiri::XML(response.response_body) if response.success?
     response.success?
   end
 
