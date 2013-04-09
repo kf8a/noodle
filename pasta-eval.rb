@@ -4,11 +4,10 @@ require 'nokogiri'
 require 'open-uri'
 require 'typhoeus'
 
-
 class PastaEval
   attr_accessor :url
 
-  def evaluate(production=nil)
+  def evaluate(production=nil, timeout_value = 30)
     @server = 'https://pasta-s.lternet.edu'
     if production.given?
       @server = 'https://pasta.lternet.edu'
@@ -29,7 +28,7 @@ class PastaEval
       @transaction_id = response.response_body
 
       #poll for completion
-      timeout_at = Time.now + 60 #30 * 60 # 30 minutes
+      timeout_at = Time.now + 60 * timeout_value
       loop do
         sleep 5
         print '.'
@@ -108,19 +107,3 @@ class PastaEval
 
 end
 
-Main {
-  argument 'url'
-  option('p') { description 'to use the production server' }
-  option('debug') { description 'print debugging statements' }
-
-  def run
-    if params['debug'].given?
-      Typhoeus::Config.verbose = true
-    end
-
-    pusher = PastaEval.new
-    pusher.url = params['url'].value
-    pusher.evaluate(params['p'])
-    puts "done, now get back to work!"
-  end
-}
