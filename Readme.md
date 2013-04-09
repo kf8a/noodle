@@ -3,7 +3,7 @@ Pasta Eval
 
 A script to evaluate the contents of an eml harvest list
 
-    git clone 
+    git clone https://github.com/kf8a/noodle.git
     bundle
     ruby pasta-eval.rb harvestlist_url
 
