@@ -29,20 +29,21 @@ class PastaEval
       @transaction_id = response.response_body
 
       #poll for completion
-      n = 0
-      while n < 200 do
+      timeout_at = Time.now + 60 #30 * 60 # 30 minutes
+      loop do
         sleep 5
         print '.'
 
         break if pasta_success?
         break if pasta_errors?
 
-        n += 1
+        break if Time.now > timeout_at
       end
 
       if @errors
         puts @errors
         @errors = nil
+        next
       end
 
       if @report
