@@ -8,7 +8,7 @@ require 'typhoeus'
 class PastaEval
   attr_accessor :url
 
-  def run(production=nil)
+  def evaluate(production=nil)
     @server = 'https://pasta-s.lternet.edu'
     if production.given?
       @server = 'https://pasta.lternet.edu'
@@ -34,43 +34,39 @@ class PastaEval
       #poll for completion
       n = 0
       $stdout.sync = true
-      loop do
-        print '.'
+      while n < 200 do
         sleep 5
-        response = Typhoeus.get("#{@server}/package/evaluate/report/eml/#{@scope}/#{@identifier}/#{@rev}/#{@transaction_id}")
-        break if response.success?
-        n += 1
-        break if n > 200
+        print '.'
 
-        # check error message
+        break if pasta_success?
         break if pasta_errors?
+
+        n += 1
       end
+      $stdout.sync = false
 
       if @errors
         puts @errors
         @errors = nil
-        next
       end
 
-      if n > 200
+      if @report
+        doc = Nokogiri::XML(@report)
+        File.write('response.xml',doc)
+
+        print_summary(doc)
+
+        # remove valid checks
+        doc.search('//qr:status[contains(text(), "valid")]/..').each do |node|
+          node.remove
+        end
+
+        File.open("#{@scope}-#{@identifier}-#{@rev}",'w') do |file|
+          file.write doc
+        end
+        @report = nil
+      else
         puts ' timeout'
-        next
-      end
-
-      doc = Nokogiri::XML(response.response_body)
-      File.write('response.xml',doc)
-
-      print_summary(doc)
-
-      $stdout.sync = false
-
-      # remove valid checks
-      doc.search('//qr:status[contains(text(), "valid")]/..').each do |node|
-        node.remove
-      end
-
-      File.open("#{@scope}-#{@identifier}-#{@rev}",'w') do |file|
-        file.write doc
       end
     end
   end
@@ -95,6 +91,12 @@ class PastaEval
     # end
   end
 
+  def pasta_success?
+    response = Typhoeus.get("#{@server}/package/evaluate/report/eml/#{@scope}/#{@identifier}/#{@rev}/#{@transaction_id}")
+    @report = response.response_body if response.success?
+    response.success?
+  end
+
   def pasta_errors?
     response = Typhoeus.get("#{@server}/package/error/#{@scope}/#{@identifier}/#{@rev}/#{@transaction_id}")
     @errors = response.response_body if response.success?
@@ -116,6 +118,7 @@ Main {
 
     pusher = PastaEval.new
     pusher.url = params['url'].value
-    pusher.run(params['p'])
+    pusher.evaluate(params['p'])
+    puts "done, now get back to work!"
   end
 }
