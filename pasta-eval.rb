@@ -24,17 +24,17 @@ class PastaEval
       evaluate_document(url)
     else
       docs.each do |eml_url|
-        evaluate_document(eml_url)
+        evaluate_document(eml_url.text)
       end
     end
   end
 
   def evaluate_document(eml_url)
-    print "#{eml_url.text} "
+    print "#{eml_url} "
     response = Typhoeus.get(eml_url, :timeout => 3000)
     eml_doc = Nokogiri::XML(response.response_body)
 
-    set_scope_id_rev(eml_url)
+    set_scope_id_rev(eml_doc)
 
     # try to evaluate
     response = Typhoeus.post("#{@server}/package/evaluate/eml",
@@ -97,7 +97,6 @@ class PastaEval
     line = index.at_css('#docs')
     stanza = Nokogiri::XML::Builder.with(line) do |html|
       html.li {
-        html.a(:href=>@source_url) { html.text @source_url }
         html.text " #{@scope}-#{@identifier}-#{@rev} valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
         html.h3 "Warns" if warns.count > 0
         html.ul {
@@ -124,12 +123,9 @@ class PastaEval
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
   end
 
-  def set_scope_id_rev(fragment)
-    @source_url = fragment.text
-    info = fragment.parent
-    @scope = info.search('scope').text
-    @identifier = info.search('identifier').text
-    @rev = info.search('revision').text
+  def set_scope_id_rev(doc)
+    package_id = doc.root['packageId']
+    @scope, @identifier, @rev = package_id.split(/\./)
   end
 
   def pasta_success?
