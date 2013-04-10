@@ -1,50 +1,63 @@
 require 'main'
 require 'rest-client'
 require 'nokogiri'
-require 'open-uri'
 require 'typhoeus'
 
 class PastaEval
   attr_accessor :url
 
-  def evaluate(production=nil, timeout_value = 30)
+  def evaluate(production=nil, timeout_val = 30)
+    @time_out_value = timeout_val
+    if File.exists?('index.html')
+      File.unlink('index.html')
+    end
     @server = 'https://pasta-s.lternet.edu'
     if production.given?
       @server = 'https://pasta.lternet.edu'
     end
 
     #get url
-    doc = Nokogiri::XML(open(url))
-    doc.xpath('//documentURL').each do |eml_url|
-      print "#{eml_url.text} "
-      eml_doc = Nokogiri::XML(open(eml_url))
-
-      set_scope_id_rev(eml_url)
-
-      # try to evaluate
-      response = Typhoeus.post("#{@server}/package/evaluate/eml",
-                               :body  => eml_doc.to_s,
-                               :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-      @transaction_id = response.response_body
-
-      #poll for completion
-      timeout_at = Time.now + 60 * timeout_value
-      loop do
-        sleep 5
-        print '.'
-
-        break if pasta_success?
-        break if pasta_errors?
-
-        break if Time.now > timeout_at
+    response = Typhoeus.get(url, :timeout => 3000)
+    doc = Nokogiri::XML(response.response_body)
+    docs = doc.xpath('//documentURL')
+    if docs.empty?
+      evaluate_document(url)
+    else
+      docs.each do |eml_url|
+        evaluate_document(eml_url)
       end
+    end
+  end
 
-      if @errors
-        puts @errors
-        @errors = nil
-        next
-      end
+  def evaluate_document(eml_url)
+    print "#{eml_url.text} "
+    response = Typhoeus.get(eml_url, :timeout => 3000)
+    eml_doc = Nokogiri::XML(response.response_body)
 
+    set_scope_id_rev(eml_url)
+
+    # try to evaluate
+    response = Typhoeus.post("#{@server}/package/evaluate/eml",
+                             :body  => eml_doc.to_s,
+                             :headers => {'Content-Type' => "application/xml; charset=utf-8"})
+    @transaction_id = response.response_body
+
+    #poll for completion
+    timeout_at = Time.now + 60 * @time_out_value
+    loop do
+      sleep 10
+      print '.'
+
+      break if pasta_success?
+      break if pasta_errors?
+
+      break if Time.now > timeout_at
+    end
+
+    if @errors
+      puts @errors
+      @errors = nil
+    else
       if @report
         print_summary
         save_results
@@ -61,15 +74,15 @@ class PastaEval
   end
 
   def warns
-    @report.search('//qr:status[contains(text(), "warn")]')
+    @report.search('//qr:status[contains(text(), "warn")]/..')
   end
 
   def infos
-    @report.search('//qr:status[contains(text(), "info")]')
+    @report.search('//qr:status[contains(text(), "info")]/..')
   end
 
   def errors
-    @report.search('//qr:status[contains(text(), "error")]')
+    @report.search('//qr:status[contains(text(), "error")]/..')
   end
 
   def save_results
@@ -77,21 +90,32 @@ class PastaEval
     if File.exists?('index.html')
       index = Nokogiri::HTML(open('index.html'))
     else
-      builder = Nokogiri::HTML::Builder.new do |doc|
-        doc.html {
-          doc.body { }
-        }
-      end
-      index = builder.to_html
+      index = Nokogiri::HTML('<html><head><link href="bootstrap/css/bootstrap.min.css" rel="stylesheet"></link></head><body><ul id="docs"></ul></body>')
+      File.write('index.html', index)
     end
     # append a line to the index file
-
-    # remove valid checks
-    @report.search('//qr:status[contains(text(), "valid")]/..').each do |node|
-      node.remove
+    line = index.at_css('#docs')
+    stanza = Nokogiri::XML::Builder.with(line) do |html|
+      html.li {
+        html.a(:href=>@source_url) { html.text @source_url }
+        html.text " #{@scope}-#{@identifier}-#{@rev} valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
+        html.h3 "Warns" if warns.count > 0
+        html.ul {
+          warns.each do |warn|
+          html.li {
+            html.text "Name: #{warn.css('name')}"
+            html.text "Expected: #{warn.css('expected')}"
+            html.text "Found: #{warn.css('found')}"
+          }
+          end
+        }
+        html.h3 "Errors" if errors.count > 0
+      }
     end
 
-    File.open("#{@scope}-#{@identifier}-#{@rev}",'w') do |file|
+    File.write('index.html', index)
+
+    File.open("#{@scope}-#{@identifier}-#{@rev}.xml",'w') do |file|
       file.write @report
     end
   end
@@ -101,6 +125,7 @@ class PastaEval
   end
 
   def set_scope_id_rev(fragment)
+    @source_url = fragment.text
     info = fragment.parent
     @scope = info.search('scope').text
     @identifier = info.search('identifier').text
@@ -119,7 +144,6 @@ class PastaEval
 
     response.success?
   end
-
 end
 
 Main {
