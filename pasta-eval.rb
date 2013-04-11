@@ -125,7 +125,9 @@ class PastaEval
 
   def set_scope_id_rev(doc)
     package_id = doc.root['packageId']
-    @scope, @identifier, @rev = package_id.split(/\./)
+    if package_id
+      @scope, @identifier, @rev = package_id.split(/\./)
+    end
   end
 
   def pasta_success?
