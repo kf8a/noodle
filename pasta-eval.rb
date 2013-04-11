@@ -4,7 +4,15 @@ require 'nokogiri'
 require 'typhoeus'
 
 class PastaEval
-  attr_accessor :url
+  attr_accessor :url, :xsd
+
+  def initialize
+    super
+    Dir.chdir("./lib/eml") do
+      @xsd = Nokogiri::XML::Schema(File.read("eml.xsd"))
+    end
+  end
+
 
   def evaluate(production=nil, timeout_val = 30)
     @time_out_value = timeout_val
@@ -34,45 +42,49 @@ class PastaEval
     print "#{eml_url} "
     response = Typhoeus.get(eml_url, :timeout => 3000)
     eml_doc = Nokogiri::XML(response.response_body)
+    if xsd.validate(eml_doc)
 
-    set_scope_id_rev(eml_doc)
+      set_scope_id_rev(eml_doc)
 
-    # try to evaluate
-    response = Typhoeus.post("#{@server}/package/evaluate/eml",
-                             :body  => eml_doc.to_s,
-                             :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-    @transaction_id = response.response_body
-    print "#{@scope}.#{@identifier}.#{@rev} "
-    print @transaction_id
+      # try to evaluate
+      response = Typhoeus.post("#{@server}/package/evaluate/eml",
+                               :body  => eml_doc.to_s,
+                               :headers => {'Content-Type' => "application/xml; charset=utf-8"})
+      @transaction_id = response.response_body
+      print "#{@scope}.#{@identifier}.#{@rev} "
+      print @transaction_id
 
-    if @transaction_id.empty?
-      puts "failed to submit"
-    else
-      #poll for completion
-      timeout_at = Time.now + 60 * @time_out_value
-      loop do
-        sleep 10
-        print '.'
-
-        break if pasta_success?
-        break if pasta_errors?
-
-        break if Time.now > timeout_at
-      end
-
-      if @errors
-        puts @errors
-        @errors = nil
+      if @transaction_id.empty?
+        puts "failed to submit"
       else
-        if @report
-          print_summary
-          save_results
+        #poll for completion
+        timeout_at = Time.now + 60 * @time_out_value
+        loop do
+          sleep 10
+          print '.'
 
-          @report = nil
+          break if pasta_success?
+          break if pasta_errors?
+
+          break if Time.now > timeout_at
+        end
+
+        if @errors
+          puts @errors
+          @errors = nil
         else
-          puts ' timeout'
+          if @report
+            print_summary
+            save_results
+
+            @report = nil
+          else
+            puts ' timeout'
+          end
         end
       end
+    else
+      puts 'Error: not an eml document'
     end
   end
 
