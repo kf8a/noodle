@@ -24,6 +24,7 @@ class PastaEval
       evaluate_document(url)
     else
       docs.each do |eml_url|
+        clear_scope_id_rev
         evaluate_document(eml_url.text)
       end
     end
@@ -41,6 +42,7 @@ class PastaEval
                              :body  => eml_doc.to_s,
                              :headers => {'Content-Type' => "application/xml; charset=utf-8"})
     @transaction_id = response.response_body
+    print "#{@scope}.#{@identifier}.#{@rev} "
     print @transaction_id
 
     if @transaction_id.empty?
@@ -126,6 +128,10 @@ class PastaEval
 
   def print_summary
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
+  end
+
+  def clear_scope_id_rev
+    @scope = @identifier = @rev = nil
   end
 
   def set_scope_id_rev(doc)
