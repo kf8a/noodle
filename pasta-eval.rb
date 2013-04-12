@@ -125,7 +125,7 @@ class PastaEval
 
     File.write('index.html', index)
 
-    File.open("#{@scope}-#{@identifier}-#{@rev}.xml",'w') do |file|
+    File.open("#{@scope}.#{@identifier}.#{@rev}.xml",'w') do |file|
       file.write @report
     end
   end
