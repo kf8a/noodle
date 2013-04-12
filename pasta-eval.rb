@@ -4,15 +4,7 @@ require 'nokogiri'
 require 'typhoeus'
 
 class PastaEval
-  attr_accessor :url, :xsd
-
-  def initialize
-    super
-    Dir.chdir("./lib/eml") do
-      @xsd = Nokogiri::XML::Schema(File.read("eml.xsd"))
-    end
-  end
-
+  attr_accessor :url
 
   def evaluate(production=nil, timeout_val = 30)
     @time_out_value = timeout_val
@@ -42,8 +34,7 @@ class PastaEval
     print "#{eml_url} "
     response = Typhoeus.get(eml_url, :timeout => 3000)
     eml_doc = Nokogiri::XML(response.response_body)
-    p xsd.validate(eml_doc)
-    if xsd.validate(eml_doc).size == 0
+    if eml_doc.root.first
 
       set_scope_id_rev(eml_doc)
 
