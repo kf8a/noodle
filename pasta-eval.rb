@@ -42,7 +42,8 @@ class PastaEval
     print "#{eml_url} "
     response = Typhoeus.get(eml_url, :timeout => 3000)
     eml_doc = Nokogiri::XML(response.response_body)
-    if xsd.validate(eml_doc)
+    p xsd.validate(eml_doc)
+    if xsd.validate(eml_doc).size == 0
 
       set_scope_id_rev(eml_doc)
 
