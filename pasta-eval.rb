@@ -1,19 +1,26 @@
 require 'main'
-require 'rest-client'
 require 'nokogiri'
+require 'yaml'
+require 'etc'
 require 'typhoeus'
 
 class PastaEval
   attr_accessor :url
 
-  def evaluate(production=nil, timeout_val = 30)
+  def initialize(production=nil)
+    credentials = File.open('credentials.yaml') {|y| YAML::load(y)}
+    @user       = "uid=#{credentials['username']},o=LTER,dc=ecoinformatics,dc=org:#{credentials['password']}"
+    @server     = 'https://pasta-s.lternet.edu'
+
+    if production.given?
+      @server   = 'https://pasta.lternet.edu'
+    end
+  end
+
+  def evaluate(timeout_val = 30)
     @time_out_value = timeout_val
     if File.exists?('index.html')
       File.unlink('index.html')
-    end
-    @server = 'https://pasta-s.lternet.edu'
-    if production.given?
-      @server = 'https://pasta.lternet.edu'
     end
 
     #get url
@@ -40,6 +47,7 @@ class PastaEval
 
       # try to evaluate
       response = Typhoeus.post("#{@server}/package/evaluate/eml",
+                               :userpwd=> @user,
                                :body  => eml_doc.to_s,
                                :headers => {'Content-Type' => "application/xml; charset=utf-8"})
       @transaction_id = response.response_body
@@ -67,7 +75,6 @@ class PastaEval
         else
           if @report
             print_summary
-            save_results
 
             @report = nil
           else
@@ -96,40 +103,6 @@ class PastaEval
     @report.search('//qr:status[contains(text(), "error")]/..')
   end
 
-  def save_results
-
-    if File.exists?('index.html')
-      index = Nokogiri::HTML(open('index.html'))
-    else
-      index = Nokogiri::HTML('<html><head><link href="bootstrap/css/bootstrap.min.css" rel="stylesheet"></link></head><body><ul id="docs"></ul></body>')
-      File.write('index.html', index)
-    end
-    # append a line to the index file
-    line = index.at_css('#docs')
-    stanza = Nokogiri::XML::Builder.with(line) do |html|
-      html.li {
-        html.text " #{@scope}-#{@identifier}-#{@rev} valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
-        html.h3 "Warns" if warns.count > 0
-        html.ul {
-          warns.each do |warn|
-          html.li {
-            html.text "Name: #{warn.css('name')}"
-            html.text "Expected: #{warn.css('expected')}"
-            html.text "Found: #{warn.css('found')}"
-          }
-          end
-        }
-        html.h3 "Errors" if errors.count > 0
-      }
-    end
-
-    File.write('index.html', index)
-
-    File.open("#{@scope}.#{@identifier}.#{@rev}.xml",'w') do |file|
-      file.write @report
-    end
-  end
-
   def print_summary
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
   end
@@ -146,13 +119,13 @@ class PastaEval
   end
 
   def pasta_success?
-    response = Typhoeus.get("#{@server}/package/evaluate/report/eml/#{@scope}/#{@identifier}/#{@rev}/#{@transaction_id}")
+    response = Typhoeus.get("#{@server}/package/evaluate/report/eml/#{@transaction_id}", :userpwd => @user)
     @report = Nokogiri::XML(response.response_body) if response.success?
     response.success?
   end
 
   def pasta_errors?
-    response = Typhoeus.get("#{@server}/package/error/#{@scope}/#{@identifier}/#{@rev}/#{@transaction_id}")
+    response = Typhoeus.get("#{@server}/package/error/eml/#{@transaction_id}", :userpwd => @user)
     @errors = response.response_body if response.success?
 
     response.success?
@@ -175,9 +148,9 @@ Main {
       Typhoeus::Config.verbose = true
     end
 
-    pusher = PastaEval.new
+    pusher = PastaEval.new(params['p'])
     pusher.url = params['url'].value
-    pusher.evaluate(params['p'],params['timeout'].value)
+    pusher.evaluate(params['timeout'].value)
     puts "done, now get back to work!"
   end
 }
