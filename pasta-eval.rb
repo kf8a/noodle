@@ -1,7 +1,6 @@
 require 'main'
 require 'nokogiri'
 require 'yaml'
-require 'etc'
 require 'typhoeus'
 
 class PastaEval
@@ -59,24 +58,17 @@ class PastaEval
       else
         #poll for completion
         timeout_at = Time.now + 60 * @time_out_value
-        loop do
+
+        begin
           sleep 10
           print '.'
-
-          break if pasta_success?
-          break if pasta_errors?
-
-          break if Time.now > timeout_at
-        end
+        end until completed?
 
         if @errors
-          puts @errors
-          @errors = nil
+          print_errors
         else
           if @report
             print_summary
-
-            @report = nil
           else
             puts ' timeout'
           end
@@ -85,6 +77,10 @@ class PastaEval
     else
       puts 'Error: not an eml document'
     end
+  end
+
+  def completed?
+    pasta_success? || pasta_errors? || Time.now > timeout_at
   end
 
   def valids
@@ -103,8 +99,14 @@ class PastaEval
     @report.search('//qr:status[contains(text(), "error")]/..')
   end
 
+  def print_errors
+    puts @errors
+    @errors = nil
+  end
+
   def print_summary
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
+    @report = nil
   end
 
   def clear_scope_id_rev
