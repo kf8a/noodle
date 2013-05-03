@@ -1,4 +1,3 @@
-require 'main'
 require 'nokogiri'
 require 'yaml'
 require 'typhoeus'
@@ -7,12 +6,14 @@ class PastaEval
   attr_accessor :url
 
   def initialize(production=nil)
-    credentials = File.open('credentials.yaml') {|y| YAML::load(y)}
-    @user       = "uid=#{credentials['username']},o=LTER,dc=ecoinformatics,dc=org:#{credentials['password']}"
-    @server     = 'https://pasta-s.lternet.edu'
+    if File.exists?('credentials.yaml')
+      credentials = File.open('credentials.yaml') {|y| YAML::load(y)}
+      @user       = "uid=#{credentials['username']},o=LTER,dc=ecoinformatics,dc=org:#{credentials['password']}"
+    end
 
+    @server       = 'https://pasta-s.lternet.edu'
     if production.given?
-      @server   = 'https://pasta.lternet.edu'
+      @server     = 'https://pasta.lternet.edu'
     end
   end
 
@@ -133,27 +134,3 @@ class PastaEval
     response.success?
   end
 end
-
-Main {
-  argument 'url'
-  option('p') { description 'to use the production server' }
-  option('debug') { description 'print debugging statements' }
-  option('timeout') {
-    argument :optional
-    cast :integer
-    default 30
-    description 'timeout in minutes'
-  }
-
-  def run
-    if params['debug'].given?
-      Typhoeus::Config.verbose = true
-    end
-
-    pusher = PastaEval.new(params['p'])
-    pusher.url = params['url'].value
-    pusher.evaluate(params['timeout'].value)
-    puts "done, now get back to work!"
-  end
-}
-
