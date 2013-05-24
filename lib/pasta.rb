@@ -2,8 +2,12 @@ require 'nokogiri'
 require 'yaml'
 require 'typhoeus'
 
+#TODO report/doi/eml/{scope}/{identifier}/{revision}
+#curl -i -X GET https://pasta.lternet.edu/package/report/doi/eml/knb-lter-lno/1/1
+
 class PastaEval
   attr_accessor :url
+  attr_accessor :upload
 
   def initialize(production=nil)
     if File.exists?('credentials.yaml')
@@ -16,6 +20,20 @@ class PastaEval
       @server     = 'https://pasta.lternet.edu'
     end
   end
+
+  def delete_all
+    response = Typhoeus.get("#{@server}/package/eml/knb-lter-kbs",
+                             :userpwd=> @user)
+    response.body.each_line do |id|
+      delete(id.to_i)
+    end
+
+  end
+  def delete(id)
+    response = Typhoeus.delete("#{@server}/package/eml/knb-lter-kbs/#{id}",
+                             :userpwd=> @user)
+  end
+
 
   def evaluate(timeout_val = 30)
     @time_out_value = timeout_val
@@ -38,6 +56,7 @@ class PastaEval
   end
 
   def evaluate_document(eml_url)
+
     print "#{eml_url} "
     response = Typhoeus.get(eml_url, :timeout => 3000)
     eml_doc = Nokogiri::XML(response.response_body)
@@ -60,16 +79,19 @@ class PastaEval
         #poll for completion
         timeout_at = Time.now + 60 * @time_out_value
 
-        begin
+        while !completed?(timeout_at) do
           sleep 10
           print '.'
-        end until completed?
+        end 
 
         if @errors
           print_errors
         else
           if @report
             print_summary
+            if upload && errors.count == 0 
+              submit_document(eml_doc) 
+            end
           else
             puts ' timeout'
           end
@@ -80,7 +102,16 @@ class PastaEval
     end
   end
 
-  def completed?
+  def submit_document(doc)
+    response = Typhoeus.post("#{@server}/package/eml",
+                             :userpwd=> @user,
+                             :body  => doc.to_s,
+                             :headers => {'Content-Type' => "application/xml; charset=utf-8"})
+    # puts response.headers
+    # puts response.body
+  end
+
+  def completed?(timeout_at)
     pasta_success? || pasta_errors? || Time.now > timeout_at
   end
 
@@ -102,12 +133,10 @@ class PastaEval
 
   def print_errors
     puts @errors
-    @errors = nil
   end
 
   def print_summary
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
-    @report = nil
   end
 
   def clear_scope_id_rev
@@ -122,12 +151,19 @@ class PastaEval
   end
 
   def pasta_success?
+    @report = nil
     response = Typhoeus.get("#{@server}/package/evaluate/report/eml/#{@transaction_id}", :userpwd => @user)
-    @report = Nokogiri::XML(response.response_body) if response.success?
+    if response.success?
+      @report = Nokogiri::XML(response.response_body) if response.success?
+      if errors.count > 0
+        File.open(@transaction_id, 'w') {|f| f.write @report}
+      end
+    end
     response.success?
   end
 
   def pasta_errors?
+    @errors = nil
     response = Typhoeus.get("#{@server}/package/error/eml/#{@transaction_id}", :userpwd => @user)
     @errors = response.response_body if response.success?
 

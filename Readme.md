@@ -1,4 +1,4 @@
-Pasta Eval
+Noodle
 =========
 
 A script to evaluate and post the contents of an eml harvest list
