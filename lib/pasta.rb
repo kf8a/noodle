@@ -48,7 +48,8 @@ class PastaEval
     if docs.empty?
       evaluate_document(url)
     else
-      docs.each do |eml_url|
+      docs.each_with_index do |eml_url, index|
+        print "#{index} "
         clear_scope_id_rev
         evaluate_document(eml_url.text)
       end
