@@ -7,10 +7,8 @@ A script to evaluate and post the contents of an eml harvest list
     bundle
     ruby pasta.rb harvestlist_url
 
-If you want to access pasta with authentication create a "credentials.yaml" file containing the username and password
-
-  username: ucaroll
-  password: somepassword
+If you need to access pasta with authentication copy the credentials.yaml.example to
+credentials.yaml and adjust the user name and password
 
 To get help:
 
