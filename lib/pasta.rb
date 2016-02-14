@@ -30,8 +30,12 @@ class PastaEval
 
   end
   def delete(id)
-    response = Typhoeus.delete("#{@server}/package/eml/knb-lter-kbs/#{id}",
-                             :userpwd=> @user)
+    response = Typhoeus.get("#{@server}/package/eml/knb-lter-kbs/#{id}", userpwd: @user)
+    response.body.each_line do |i|
+      response = Typhoeus.delete("#{@server}/package/eml/knb-lter-kbs/#{id}",
+                                 :userpwd=> @user)
+      puts(response.body)
+    end
   end
 
 
@@ -52,6 +56,7 @@ class PastaEval
         print "#{index} "
         clear_scope_id_rev
         evaluate_document(eml_url.text)
+        sleep(10)
       end
     end
   end
