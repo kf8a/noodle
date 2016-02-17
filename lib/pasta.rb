@@ -96,13 +96,8 @@ class PastaEval
         else
           if @report
             print_summary
-            if errors.count == 0
-              if upload
-                submit_document(eml_doc) 
-              end
-              if update
-                update_document(eml_doc)
-              end
+            if upload && errors.count == 0
+              submit_document(eml_doc) 
             end
           else
             puts ' timeout'
@@ -115,6 +110,21 @@ class PastaEval
   end
 
   def submit_document(doc)
+    if document_exists?(doc)
+      update_document(doc)
+    else
+      submit_new_document(doc)
+    end
+  end
+
+  def document_exists?(doc)
+    package, id, version = doc.root.attribute('packageId').value.split(/\./)
+    document_exists = Typhoeus.get("#{server}/package/eml/#{package}/#{id}") 
+    document_exists.success?
+  end
+
+
+  def submit__new_document(doc)
     response = Typhoeus.post("#{@server}/package/eml",
                              :userpwd=> @user,
                              :body  => doc.to_s,
