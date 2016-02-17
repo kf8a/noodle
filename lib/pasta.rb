@@ -8,6 +8,7 @@ require 'typhoeus'
 class PastaEval
   attr_accessor :url
   attr_accessor :upload
+  attr_accessor :update
 
   def initialize(production=nil)
     if File.exists?('credentials.yaml')
@@ -95,8 +96,13 @@ class PastaEval
         else
           if @report
             print_summary
-            if upload && errors.count == 0 
-              submit_document(eml_doc) 
+            if errors.count == 0
+              if upload
+                submit_document(eml_doc) 
+              end
+              if update
+                update_document(eml_doc)
+              end
             end
           else
             puts ' timeout'
@@ -113,8 +119,18 @@ class PastaEval
                              :userpwd=> @user,
                              :body  => doc.to_s,
                              :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-    # puts response.headers
-    # puts response.body
+    puts response.headers
+    puts response.body
+  end
+
+  def update_document(doc)
+    package, id, version = doc.root.attribute('packageId').value.split(/\./)
+    response = Typhoeus.put("#{@server}/package/eml/#{package}/#{id}",
+                             :userpwd=> @user,
+                             :body  => doc.to_s,
+                             :headers => {'Content-Type' => "application/xml; charset=utf-8"})
+    puts response.headers
+    puts response.body
   end
 
   def completed?(timeout_at)
