@@ -80,71 +80,103 @@ class PastaEval
       print "#{@scope}.#{@identifier}.#{@rev} "
       print @transaction_id
 
-      if @transaction_id.empty?
-        puts "failed to submit"
-      else
-        #poll for completion
-        timeout_at = Time.now + 60 * @time_out_value
-
-        while !completed?(timeout_at) do
-          sleep 10
-          print '.'
-        end 
-
-        if @errors
-          print_errors
-        else
-          if @report
-            print_summary
-            if upload && errors.count == 0
-              submit_document(eml_doc) 
-            end
-          else
-            puts ' timeout'
-          end
-        end
-      end
+      wait_for_eval_completion(eml_doc)
     else
       puts 'Error: not an eml document'
     end
   end
 
+  def wait_for_eval_completion(eml_doc)
+    if @transaction_id.empty?
+      puts "failed to submit"
+    else
+      #poll for completion
+      timeout_at = Time.now + 60 * @time_out_value
+
+      while !completed?(timeout_at) do
+        sleep 10
+        print '.'
+      end 
+
+      if @errors
+        print_errors
+      else
+        if @report
+          print_summary
+          #TODO this should be after the function returns
+          if upload && errors.count == 0
+            submit_document(eml_doc) 
+          end
+        else
+          puts ' timeout'
+        end
+      end
+    end
+  end
+
+  def wait_for_completion(eml_doc)
+    if @transaction_id.empty?
+      puts "failed to submit"
+    else
+      #poll for completion
+      timeout_at = Time.now + 60 * @time_out_value
+
+      while !completed?(timeout_at) do
+        sleep 10
+        print '.'
+      end 
+
+      if @errors
+        print_errors
+      elsif timeout_at < Time.now()
+        puts ' timeout'
+      else
+        puts ' done'
+      end
+    end
+  end
+
   def submit_document(doc)
-    if document_exists?(doc)
+    if document_exists?
       update_document(doc)
     else
       submit_new_document(doc)
     end
   end
 
-  def document_exists?(doc)
-    package, id, version = doc.root.attribute('packageId').value.split(/\./)
-    document_exists = Typhoeus.get("#{server}/package/eml/#{package}/#{id}") 
+  def document_exists?
+    document_exists = Typhoeus.get("#{@server}/package/eml/#{@scope}/#{@identifier}") 
+    document_exists.success?
+  end
+
+  def document_version_exists?
+    document_exists = Typhoeus.get("#{@server}/package/eml/#{@scope}/#{@identifier}/#{@rev}") 
     document_exists.success?
   end
 
 
-  def submit__new_document(doc)
+  def submit_new_document(doc)
     response = Typhoeus.post("#{@server}/package/eml",
                              :userpwd=> @user,
                              :body  => doc.to_s,
                              :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-    puts response.headers
-    puts response.body
+    @transaction_id = response.response_body
+    print @transaction_id
+    wait_for_completion(doc)
   end
 
   def update_document(doc)
-    package, id, version = doc.root.attribute('packageId').value.split(/\./)
-    response = Typhoeus.put("#{@server}/package/eml/#{package}/#{id}",
+    response = Typhoeus.put("#{@server}/package/eml/#{@scope}/#{@identifier}",
                              :userpwd=> @user,
                              :body  => doc.to_s,
                              :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-    puts response.headers
-    puts response.body
+    @transaction_id = response.response_body
+    print @transaction_id
+    wait_for_completion(doc)
   end
 
   def completed?(timeout_at)
-    pasta_success? || pasta_errors? || Time.now > timeout_at
+    pasta_success? || pasta_errors? || document_version_exists? || Time.now > timeout_at
   end
 
   def valids
@@ -168,6 +200,7 @@ class PastaEval
   end
 
   def print_summary
+    pasta_success?
     puts " valid: #{valids.count} info: #{infos.count} warn: #{warns.count} error: #{errors.count}"
   end
 
