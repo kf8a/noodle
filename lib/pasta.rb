@@ -1,7 +1,6 @@
 require 'nokogiri'
 require 'yaml'
 require 'typhoeus'
-require 'socket'
 
 #TODO report/doi/eml/{scope}/{identifier}/{revision}
 #curl -i -X GET https://pasta.lternet.edu/package/report/doi/eml/knb-lter-lno/1/1
@@ -81,7 +80,9 @@ class PastaEval
       end
 
       # if cached download the data files and modify the eml
-      if @cached
+      if cached
+        hostname = `hostname -f`
+        hostname.chomp!
         datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
           @file_name = "data/cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
           url = table.xpath("physical/distribution/online/url").first
@@ -100,7 +101,6 @@ class PastaEval
             # Note that response.body is ""
           end
           request.run
-          hostname = Socket.gethostname
           url.content = "http://#{hostname}:2015/#{file_name}"
         end
       end
