@@ -115,7 +115,7 @@ class PastaEval
 
       wait_for_eval_completion(eml_doc)
 
-      if cached
+      if cache
         File.unlink "data/#{@file_name}"
       end
     else
