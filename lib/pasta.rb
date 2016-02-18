@@ -1,6 +1,7 @@
 require 'nokogiri'
 require 'yaml'
 require 'typhoeus'
+require 'socket'
 
 #TODO report/doi/eml/{scope}/{identifier}/{revision}
 #curl -i -X GET https://pasta.lternet.edu/package/report/doi/eml/knb-lter-lno/1/1
@@ -8,7 +9,8 @@ require 'typhoeus'
 class PastaEval
   attr_accessor :url
   attr_accessor :upload
-  attr_accessor :update
+  attr_accessor :cache
+  attr_accessor :file_name
 
   def initialize(production=nil)
     if File.exists?('credentials.yaml')
@@ -70,6 +72,38 @@ class PastaEval
     if eml_doc.root.first
 
       set_scope_id_rev(eml_doc)
+      print " #{@scope}.#{@identifier}.#{@rev} "
+
+      # see if it is already in PASTA
+      if document_version_exists?
+        print " already in PASTA"
+        return
+      end
+
+      # if cached download the data files and modify the eml
+      if cached
+        datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
+          @file_name = "data/cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
+          url = table.xpath("physical/distribution/online/url").first
+          downloaded_file = File.open file_name, 'wb'
+          request = Typhoeus::Request.new(url.text)
+          request.on_headers do |response|
+            if response.code != 200
+              raise "Request failed"
+            end
+          end
+          request.on_body do |chunk|
+            downloaded_file.write(chunk)
+          end
+          request.on_complete do |response|
+            downloaded_file.close
+            # Note that response.body is ""
+          end
+          request.run
+          hostname = Socket.gethostname
+          url.content = "http://#{hostname}:8080/#{file_name}"
+        end
+      end
 
       # try to evaluate
       response = Typhoeus.post("#{@server}/package/evaluate/eml",
@@ -77,10 +111,11 @@ class PastaEval
                                :body  => eml_doc.to_s,
                                :headers => {'Content-Type' => "application/xml; charset=utf-8"})
       @transaction_id = response.response_body
-      print "#{@scope}.#{@identifier}.#{@rev} "
       print @transaction_id
 
       wait_for_eval_completion(eml_doc)
+
+      File.unlink @file_name
     else
       puts 'Error: not an eml document'
     end
