@@ -25,7 +25,7 @@ class PastaEval
 
   def delete_all
     response = Typhoeus.get("#{@server}/package/eml/knb-lter-kbs",
-                             :userpwd=> @user)
+                            :userpwd=> @user)
     response.body.each_line do |id|
       delete(id.to_i)
     end
@@ -36,7 +36,7 @@ class PastaEval
     response.body.each_line do |i|
       response = Typhoeus.delete("#{@server}/package/eml/knb-lter-kbs/#{id}",
                                  :userpwd=> @user)
-      puts(response.body)
+                                 puts(response.body)
     end
   end
 
@@ -74,49 +74,49 @@ class PastaEval
       print " #{@scope}.#{@identifier}.#{@rev} "
 
       # see if it is already in PASTA
-      if document_version_exists?
-        print " already in PASTA"
-        return
-      end
+      if !document_version_exists?
 
-      # if cached download the data files and modify the eml
-      if cache
-        hostname = `hostname -f`
-        hostname.chomp!
-        datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
-          @file_name = "cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
-          url = table.xpath("physical/distribution/online/url").first
-          downloaded_file = File.open "data/#{file_name}", 'wb'
-          request = Typhoeus::Request.new(url.text)
-          request.on_headers do |response|
-            if response.code != 200
-              raise "Request failed"
+        # if cached download the data files and modify the eml
+        if cache
+          hostname = `hostname -f`
+          hostname.chomp!
+          datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
+            @file_name = "cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
+            url = table.xpath("physical/distribution/online/url").first
+            downloaded_file = File.open "data/#{file_name}", 'wb'
+            request = Typhoeus::Request.new(url.text)
+            request.on_headers do |response|
+              if response.code != 200
+                raise "Request failed"
+              end
             end
+            request.on_body do |chunk|
+              downloaded_file.write(chunk)
+            end
+            request.on_complete do |response|
+              downloaded_file.close
+              # Note that response.body is ""
+            end
+            request.run
+            url.content = "http://#{hostname}:2015/#{file_name}"
           end
-          request.on_body do |chunk|
-            downloaded_file.write(chunk)
-          end
-          request.on_complete do |response|
-            downloaded_file.close
-            # Note that response.body is ""
-          end
-          request.run
-          url.content = "http://#{hostname}:2015/#{file_name}"
         end
-      end
 
-      # try to evaluate
-      response = Typhoeus.post("#{@server}/package/evaluate/eml",
-                               :userpwd=> @user,
-                               :body  => eml_doc.to_s,
-                               :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-      @transaction_id = response.response_body
-      print @transaction_id
+        # try to evaluate
+        response = Typhoeus.post("#{@server}/package/evaluate/eml",
+                                 :userpwd=> @user,
+                                 :body  => eml_doc.to_s,
+                                 :headers => {'Content-Type' => "application/xml; charset=utf-8"})
+        @transaction_id = response.response_body
+        print @transaction_id
 
-      wait_for_eval_completion(eml_doc)
+        wait_for_eval_completion(eml_doc)
 
-      if cache
-        File.unlink "data/#{@file_name}"
+        if cache
+          File.unlink "data/#{@file_name}"
+        end
+      else
+        print " already in PASTA"
       end
     else
       puts 'Error: not an eml document'
@@ -204,12 +204,12 @@ class PastaEval
 
   def update_document(doc)
     response = Typhoeus.put("#{@server}/package/eml/#{@scope}/#{@identifier}",
-                             :userpwd=> @user,
-                             :body  => doc.to_s,
-                             :headers => {'Content-Type' => "application/xml; charset=utf-8"})
-    @transaction_id = response.response_body
-    print @transaction_id
-    wait_for_completion(doc)
+                            :userpwd=> @user,
+                              :body  => doc.to_s,
+                              :headers => {'Content-Type' => "application/xml; charset=utf-8"})
+                            @transaction_id = response.response_body
+                            print @transaction_id
+                            wait_for_completion(doc)
   end
 
   def completed?(timeout_at)
