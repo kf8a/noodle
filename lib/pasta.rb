@@ -115,7 +115,9 @@ class PastaEval
 
       wait_for_eval_completion(eml_doc)
 
-      File.unlink @file_name
+      if cached
+        File.unlink "data/#{@file_name}"
+      end
     else
       puts 'Error: not an eml document'
     end

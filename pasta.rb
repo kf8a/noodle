@@ -34,6 +34,6 @@ Main {
       pusher.url = params['url'].value
       pusher.evaluate(params['timeout'].value)
     end
-    puts "done, now get back to work!"
+    puts "\done, now get back to work!"
   end
 }
