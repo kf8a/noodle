@@ -80,13 +80,13 @@ class PastaEval
       end
 
       # if cached download the data files and modify the eml
-      if cached
+      if cache
         hostname = `hostname -f`
         hostname.chomp!
         datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
-          @file_name = "data/cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
+          @file_name = "cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
           url = table.xpath("physical/distribution/online/url").first
-          downloaded_file = File.open file_name, 'wb'
+          downloaded_file = File.open "data/#{file_name}", 'wb'
           request = Typhoeus::Request.new(url.text)
           request.on_headers do |response|
             if response.code != 200
