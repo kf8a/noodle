@@ -81,7 +81,7 @@ class PastaEval
       end
 
       # if cached download the data files and modify the eml
-      if cached
+      if @cached
         datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
           @file_name = "data/cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
           url = table.xpath("physical/distribution/online/url").first
