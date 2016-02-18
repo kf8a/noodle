@@ -83,6 +83,7 @@ class PastaEval
           datatables = eml_doc.xpath("//dataset/dataTable").each do |table|
             @file_name = "cached" + table.attribute('id').text.gsub(/\//,'-') + ".csv"
             url = table.xpath("physical/distribution/online/url").first
+            print " downloading #{url.text} "
             downloaded_file = File.open "data/#{file_name}", 'wb'
             request = Typhoeus::Request.new(url.text)
             request.on_headers do |response|
