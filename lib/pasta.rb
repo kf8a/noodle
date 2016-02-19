@@ -43,7 +43,7 @@ class PastaEval
 
   def evaluate(timeout_val = 30)
     @time_out_value = timeout_val
-    File.unlink('index.html') if File.exists?('index.html')
+    File.delete('index.html') if File.exists?('index.html')
 
     #get url
     response = Typhoeus.get(url, :timeout => 3000)
@@ -112,7 +112,7 @@ class PastaEval
         wait_for_eval_completion(eml_doc)
 
         if cache
-          File.unlink "data/#{@file_name}" if File.exists?("data/#{@file_name}")
+          File.delete("data/#{@file_name}") if File.exists?("data/#{@file_name}")
         end
       else
         puts " already in PASTA"
