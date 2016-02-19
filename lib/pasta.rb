@@ -111,7 +111,7 @@ class PastaEval
 
         wait_for_eval_completion(eml_doc)
 
-        if cache && @file_name != "data/"
+        if cache && !@file_name.emppty?
           File.delete("data/#{@file_name}") if File.exists?("data/#{@file_name}")
         end
       else
