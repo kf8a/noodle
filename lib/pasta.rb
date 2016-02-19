@@ -43,9 +43,7 @@ class PastaEval
 
   def evaluate(timeout_val = 30)
     @time_out_value = timeout_val
-    if File.exists?('index.html')
-      File.unlink('index.html')
-    end
+    File.unlink('index.html') if File.exists?('index.html')
 
     #get url
     response = Typhoeus.get(url, :timeout => 3000)
@@ -114,10 +112,10 @@ class PastaEval
         wait_for_eval_completion(eml_doc)
 
         if cache
-          File.unlink "data/#{@file_name}"
+          File.unlink "data/#{@file_name}" if File.exists?("data/#{@file_name}")
         end
       else
-        print " already in PASTA"
+        puts " already in PASTA"
       end
     else
       puts 'Error: not an eml document'
