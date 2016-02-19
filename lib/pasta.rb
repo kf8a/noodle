@@ -111,7 +111,7 @@ class PastaEval
 
         wait_for_eval_completion(eml_doc)
 
-        if cache
+        if cache && @file_name != "data/"
           File.delete("data/#{@file_name}") if File.exists?("data/#{@file_name}")
         end
       else
