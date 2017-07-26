@@ -1,7 +1,7 @@
 Noodle
 =========
 
-A script to evaluate and post the contents of an eml harvest list
+A script to read an old style eml harvest list and either  evaluate and post the contents to PASTA.
 
     git clone https://github.com/kf8a/noodle.git
     bundle
